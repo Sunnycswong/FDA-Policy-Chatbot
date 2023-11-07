@@ -333,7 +333,7 @@ def extract_answer(string):
     else:
         return string
 
-def llm_pipeline_with_history(question):
+def llm_pipeline_with_history(question,sessionId):
     # set up index name 
     index_name = os.environ["AZURE_INDEX_NAME"] 
 
@@ -376,7 +376,7 @@ def llm_pipeline_with_history(question):
     CONTAINER_NAME = "acs-fda-cosmo"
 
     # session id, to be provided by frontend
-    sessionId = "111"
+    sessionId = sessionId
     user_id = "guest"
 
     history = CosmosDBChatMessageHistory(
