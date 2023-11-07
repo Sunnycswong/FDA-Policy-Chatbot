@@ -44,7 +44,8 @@ def chat():
     data = request.get_json()
     logging.info("API request param:", data)
     question = data["question"]
-    json_response = gen_ai.llm_pipeline_with_history(question)
+    sessionId = data["sessionId"]
+    json_response = gen_ai.llm_pipeline_with_history(question,sessionId)
     
     # Convert the JSON response to a JSON-serializable format    
     # Return the JSON response
