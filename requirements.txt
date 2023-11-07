@@ -28,7 +28,7 @@ validators==0.18.2
 Werkzeug==2.0.1
 zipp==3.5.0
 pypdf
-openai
+openai==0.28.1
 azure-functions
 adlfs
 langchain==0.0.254
