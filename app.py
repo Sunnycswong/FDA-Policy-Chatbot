@@ -45,12 +45,9 @@ def chat():
     logging.info("API request param:", data)
     question = data["question"]
     json_response = gen_ai.llm_pipeline_with_history(question)
-
-    # Create an instance of the custom JSON encoder
-    encoder = CustomJSONEncoder()
     
     # Convert the JSON response to a JSON-serializable format
-    json_response = encoder.encode(json_response)
+    json_response = encode(json_response)
     
     # Return the JSON response
     return json_response
