@@ -456,9 +456,10 @@ def llm_pipeline_with_history(question):
     answer = extract_answer(answer_value)
     
     #return answer_value
-    
+
+    #output
     json_response = {
-        "raw": [output],
+        "raw": answer,
         "answer": answer,
         "source": source,
         "website_url": website_url,
