@@ -20,7 +20,12 @@ from azure.search.documents.indexes.models import (
     VectorSearchAlgorithmConfiguration,
 )
 from azure.storage.blob import BlobServiceClient
-
+from langchain.chains import LLMChain
+from langchain.llms import AzureOpenAI 
+from langchain.memory import ConversationBufferMemory
+from langchain.prompts import PromptTemplate
+from langchain.chat_models import AzureChatOpenAI
+from langchain.memory import CosmosDBChatMessageHistory
 import openai
 import os
 from langchain.embeddings.openai import OpenAIEmbeddings
@@ -47,6 +52,7 @@ from langchain.chains.question_answering import load_qa_chain
 from langchain.memory import ConversationBufferMemory
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
+from langchain.chains import ConversationalRetrievalChain
 
 # Import Azure OpenAI
 from langchain.llms import AzureOpenAI 
@@ -56,18 +62,94 @@ from langchain.schema import HumanMessage
 #import textwrap
 import logging
 
-# lingua
-from lingua import Language, LanguageDetectorBuilder
-
-
-
 # setting up credentials
-os.environ["AZURE_COGNITIVE_SEARCH_SERVICE_NAME"] = "gptdemosearch" # replace with yours search service name
-os.environ["AZURE_COGNITIVE_SEARCH_API_KEY"] = "PcAZcXbX2hJsxMYExc2SnkMFO0D94p7Zw3Qzeu5WjYAzSeDMuR5O" # replace with your api key
-os.environ["AZURE_INDEX_NAME"] = "sino-hr-chatbot"
+os.environ["AZURE_COGNITIVE_SEARCH_SERVICE_NAME"] = "acs-testing-sunny" # replace with yours search service name
+os.environ["AZURE_COGNITIVE_SEARCH_API_KEY"] = "oygYftyrBXiWoDLoZatDKNSLFttn9frM6DE4XlSb7kAzSeBR01eY" # replace with your api key
+os.environ["AZURE_INDEX_NAME"] = "your-index-name" #"namfung-finance-chatbot" # 
 # end setting up credentials
 
-# retriever = AzureCognitiveSearchRetriever(content_key="content", top_k=10)
+def initialize_vector_store():
+    # set up index name 
+    index_name = os.environ["AZURE_INDEX_NAME"] 
+    
+    # set up openai environment
+    os.environ["OPENAI_API_TYPE"] = "azure"
+    os.environ["OPENAI_API_BASE"] = "https://pwcjay.openai.azure.com/"
+    os.environ["OPENAI_API_VERSION"] = "2023-05-15"
+    os.environ["OPENAI_API_KEY"] = "f282a661571f45a0bdfdcd295ac808e7"
+
+    model: str = "text-embedding-ada-002"
+    search_service = os.environ["AZURE_COGNITIVE_SEARCH_SERVICE_NAME"]
+    search_api_key = os.environ["AZURE_COGNITIVE_SEARCH_API_KEY"]
+    vector_store_address: str = f"https://{search_service}.search.windows.net"
+    vector_store_password: str = search_api_key
+    
+
+    # define embedding model for calculating the embeddings
+    model: str = "text-embedding-ada-002"
+    embeddings: OpenAIEmbeddings = OpenAIEmbeddings(deployment=model, chunk_size=1)
+    embedding_function = embeddings.embed_query
+
+    # define schema of the json file stored on the index
+    fields = [
+            SimpleField(
+                name="id",
+                type=SearchFieldDataType.String,
+                key=True,
+                filterable=True,
+            ),
+            SearchableField(
+                name="content",
+                type=SearchFieldDataType.String,
+                searchable=True,
+            ),
+            SearchField(
+                name="content_vector",
+                type=SearchFieldDataType.Collection(SearchFieldDataType.Single),
+                searchable=True,
+                vector_search_dimensions=len(embedding_function("Text")),
+                vector_search_configuration="default",
+            ),
+            SearchableField(
+                name="metadata",
+                type=SearchFieldDataType.String,
+                searchable=True,
+            ),
+            # Additional field to store the title
+            SearchableField(
+                name="title",
+                type=SearchFieldDataType.String,
+                searchable=True,
+            ),
+            # Additional field for filtering on document source
+            SimpleField(
+                name="source",
+                type=SearchFieldDataType.String,
+                filterable=True,
+            ),
+            # Additional field for filtering on document source
+            SimpleField(
+                name="page",
+                type=SearchFieldDataType.String,
+                filterable=True,
+            ),
+            # Additional field for filtering on document source
+            SimpleField(
+                name="website_url",
+                type=SearchFieldDataType.String,
+                filterable=True,
+            ),
+        ]    
+    
+    vector_store: AzureSearch = AzureSearch(
+        azure_search_endpoint=vector_store_address,
+        azure_search_key=vector_store_password,
+        index_name=index_name,
+        embedding_function=embedding_function,
+        fields=fields,
+    )
+    
+    return vector_store
 
 def azure_search_by_index(question, index_name):
 
@@ -152,13 +234,7 @@ def azure_search_by_index(question, index_name):
     
     context = "\n".join([doc.page_content for doc in relevant_documentation])[:10000]
 
-    #lang = detect(question)
-
-    # change to lingua
-    languages = [Language.ENGLISH, Language.CHINESE]
-    detector = LanguageDetectorBuilder.from_languages(*languages).build()
-    lang = detector.detect_language_of(question)
-
+    lang = detect(context)
 
     #print(doc)
     #print(context)
@@ -183,50 +259,63 @@ def azure_search_by_index(question, index_name):
         relevant_documentation = relevant_documentation
     return relevant_documentation, source, website_url, lang, page_no
 
-def generate_prompt():
+
+# helper function to extract page number
+def extract_page_no(string):
+    if "[Page" in string:
+        print(re.findall('\[Page:.*\]', string)[0].split('Page:')[1])
+        return re.findall('\[Page:.*\]', string)[0].split(':')[1].split("]")[0].strip()
+    else:
+        return "/"
+
+def extract_answer(string):
+    if "[Page" in string:
+        return string.split("[Page")[0]
+    else:
+        return string
+def generate_prompt_with_history():
     prompt_template_string="""
-    Follow exactly these 5 steps:
+    Follow exactly these 6 steps:
     1. Read the context below and aggregrate this data
     Context : {context}
-    2. Answer the question using only this context
+    2. Answer the question using only this context and the chat history below
     3. Answer the question in less than 200 words
-    4. Please provide your answer in English
-    5. Please provide the page number of the pages where your answer are based on at the end of your response
-    6. Please provide the page numbers in the following output format: [Page: 1, 2, 3]
+    4. Please provide the page number of the pages where your answer are based on at the end of your response
+    5. Please provide the page numbers in the following output format: [Page: 1, 2, 3]
+    6. Allow the chat continue by following Chat History
+    
+    Chat History: {chat_history}
+
     User Question: {question}
 
-    Don't justify your answers. Don't give information not mentioned in the given context
-    
-    If you don't have any context and are unsure of the answer, reply that you don't know about this topic.
 
-    Please provide your answer in English
+    If you don't have any context and are unsure of the answer, reply that you don't know about this topic.
     """
-    prompt_template = PromptTemplate(template = prompt_template_string, input_variables=["context", "question"])
+    prompt_template = PromptTemplate(template = prompt_template_string, input_variables=["context", "question", "chat_history"])
 
     return prompt_template
 
-
-def generate_prompt_chi():
+def generate_prompt_chi_with_history():
     prompt_template_string="""
     指令：
-    1. 你必須只根據以下文字的內容回答提問者的詢問。
-    2. 如果不懂得回答或文字沒有資料，請回答“對不起，我不懂得回答這個問題。”
-    3. 請以少於200字回答問題。
-    4. 請在你的回答後提供你用以回答的文字的頁數。格式範例：[Page: 1, 2, 3]
-    5. 請以繁體中文回答。
-
-    #####
+    1. 你必须只根据以下文本的内容及谈话记录回答提问者的询问。
+    2. 如果不懂得回答或文本没有资料，请回答“对不起，我不懂得回答这个问题。”
+    3. 请以少於200字回答问题。
+    4. 请在你的回答后提供你用以回答的文本的页数。格式示例：[Page: 1]
+    5. 通过谈话记录允许聊天继续
+    
     文本：{context}
+
+    谈话记录：{chat_history}
+
     #####
 
-    問題：{question}
+    问题：{question}
 
-    請以繁體中文回答
     """
-    prompt_template = PromptTemplate(template = prompt_template_string, input_variables=["context", "question"])
+    prompt_template = PromptTemplate(template = prompt_template_string, input_variables=["context", "question", "chat_history"])
 
     return prompt_template
-
 # helper function to extract page number
 def extract_page_no(string):
     if "[Page" in string:
@@ -244,68 +333,113 @@ def extract_answer(string):
     else:
         return string
 
-def llm_pipeline(question):
-
+def llm_pipeline_with_history(question):
     # set up index name 
     index_name = os.environ["AZURE_INDEX_NAME"] 
-
-    # retrieve information from Azure Search
-    relevant_docs, source, website_url, lang, page_no = azure_search_by_index(question, index_name)
-
-    #print(relevant_docs)
-
-    # generate prompt without example
-
-    '''
-    if language == "zh-cn" or language == "zh-tw":
-        PROMPT = generate_prompt_chi()
-    #if language == "en":
-    #english prompt
-    #    PROMPT = generate_prompt()
-    else:
-    #english prompt
-        PROMPT = generate_prompt()
-    
-    '''
-    
-    # use lingua instead
-    if lang == Language.CHINESE:
-        PROMPT = generate_prompt_chi()
-        language = "chinese"
-    else:
-        PROMPT = generate_prompt()
-        language = "english"
 
     os.environ["OPENAI_API_TYPE"] = "azure"
     os.environ["OPENAI_API_VERSION"] = "2023-05-15"
     os.environ["OPENAI_API_BASE"] = "https://pwcjay.openai.azure.com/"
     os.environ["OPENAI_API_KEY"] = "f282a661571f45a0bdfdcd295ac808e7"
 
+
+    # retrieve information from Azure Search
+    relevant_docs, source, website_url, language, page_no = azure_search_by_index(question, index_name)
+
+    language = detect(question)
+
+    if language == "en":
+    #english prompt
+        QA_CHAIN_PROMPT = generate_prompt_with_history()
+    else:
+        QA_CHAIN_PROMPT = generate_prompt_chi_with_history()
+
     # use AzureChatOpenAI 
     llm = AzureChatOpenAI(deployment_name="gpt-35-16k", temperature=0,
                         openai_api_version="2023-05-15", openai_api_base="https://pwcjay.openai.azure.com/")
 
-    chain = LLMChain(llm=llm, 
-                    prompt=PROMPT,
-                    #verbose=True
-                    )
 
-    output = chain.run({"context": relevant_docs, #"context": relevant_docs, 
-        "question": question,
-        })
+    """    # set up chat history database credentials
+    os.environ["COSMOS_ENDPOINT"] = "https://gpt-demo-chat-history.documents.azure.com:443/"
+    os.environ["COSMOS_KEY"] = "AZEhMpW4YD3t7iEMgp9at48S7f5ZjvnahUqJMYjMjMpH2QH2wiYBL97RdX7AqL3CMQcGGhbdAFHvACDbDDwMyA=="
+    ENDPOINT = os.environ["COSMOS_ENDPOINT"]
+    KEY = os.environ["COSMOS_KEY"]
+    DATABASE_NAME = "sino_demo"
+    CONTAINER_NAME = "sino_chat_history"""
+    
+    # set up chat history database credentials
+    os.environ["COSMOS_ENDPOINT"] = "https://acs-testing-sunny.documents.azure.com:443/"
+    os.environ["COSMOS_KEY"] = "UyxAxYPy6nhqLoTVhbs7C8NknhHoaRJuFkBaZramSAEPzNsHU0dhanOTRr2AJOjtqA1m0d5N3ujkACDbNmxrAQ=="
+    ENDPOINT = os.environ["COSMOS_ENDPOINT"]
+    KEY = os.environ["COSMOS_KEY"]
+    DATABASE_NAME = "acs-fda-sunny"
+    CONTAINER_NAME = "acs-fda-cosmo"
 
-    # wrapped_text = textwrap.fill(output, width=100)
-    # print(wrapped_text)
+    # session id, to be provided by frontend
+    sessionId = "111"
+    user_id = "guest"
 
+    history = CosmosDBChatMessageHistory(
+        cosmos_endpoint = ENDPOINT,
+        cosmos_database = DATABASE_NAME,
+        cosmos_container = CONTAINER_NAME,
+        credential = KEY,
+        session_id = sessionId,
+        user_id = user_id,
+    )
+
+    history.prepare_cosmos()
+
+    vector_store =initialize_vector_store()
+    
+    relevant_documentation = vector_store.similarity_search(query=question, k=1, search_type="similarity")
+    
+    context = "\n".join([doc.page_content for doc in relevant_documentation])[:10000]
+
+    #lang = detect(question)
+
+    #print(doc)
+    #print(context)
+    #print(relevant_documentation)
+    source = relevant_documentation[0].metadata['source']
+    #page_no = relevant_documentation[0].metadata['page']
+    website_url = relevant_documentation[0].metadata['website_url']
+
+    retriever = vector_store.as_retriever()
+
+    # add chat memory
+    memory = ConversationBufferMemory(
+        llm = llm,
+        output_key='answer',
+        memory_key='chat_history',
+        chat_memory=history,
+        return_messages=True
+    )
+
+    #QA_CHAIN_PROMPT = generate_prompt_with_history()
+
+    # The chain
+    chain = ConversationalRetrievalChain.from_llm(
+        llm,
+        retriever=retriever,
+        memory=memory,
+        combine_docs_chain_kwargs={"prompt": QA_CHAIN_PROMPT},
+        verbose=True,
+    )
+
+    #QA_CHAIN_PROMPT = PromptTemplate.from_template(template)
+
+    output = chain({"question": question})
+    
     logging.info(output)
-
-    page_no = extract_page_no(output)
-    answer = extract_answer(output)
-
-    answer = answer #+ "\n" + f"[page:{page_no}]"
-
-    # if no page number, then the source should be - and website url should be /
-
+    answer_value = output["answer"]
+    # 
+    language = "-"
+    
+    page_no = ""
+    for doc in relevant_documentation:
+        page_no = page_no + "," + doc.metadata['page'] 
+        
     logging.info(page_no)
 
     if page_no == "/" or page_no == "N/A":
@@ -317,14 +451,12 @@ def llm_pipeline(question):
         first_page_no  = page_no.split(",")[0]
     else:
         first_page_no = page_no
-
-    #if language == "en":
-    #    source = "Title: " + source
-    #    page_no = "Page: " + page_no
-    #else:
-    #    source = "文本来源: " + source
-    #    page_no = "页数: " + page_no
-
+    
+    page_no = extract_page_no(answer_value)
+    answer = extract_answer(answer_value)
+    
+    #return answer_value
+    
     json_response = {
         "raw": output,
         "answer": answer,
@@ -334,10 +466,4 @@ def llm_pipeline(question):
         "first_page_no": first_page_no,
         "language": language
     }
-
-    return json_response #textwrap.fill(question, width=100), textwrap.fill(output, width=100)
-    
-
-
-
-
+    return json_response
