@@ -43,7 +43,7 @@ def chat():
     data = request.get_json()
     logging.info("API request param:", data)
     question = data["question"]
-    json_response = gen_ai.llm_pipeline(question)
+    json_response = gen_ai.llm_pipeline_with_history(question)
     return jsonify(json_response)
 
 if __name__ == '__main__':
