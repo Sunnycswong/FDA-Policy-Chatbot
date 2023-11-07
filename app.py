@@ -46,12 +46,9 @@ def chat():
     question = data["question"]
     json_response = gen_ai.llm_pipeline_with_history(question)
     
-    # Convert the JSON response to a JSON-serializable format
-    json_response = encode(json_response)
-    
+    # Convert the JSON response to a JSON-serializable format    
     # Return the JSON response
-    return json_response
-    #return jsonify(json_response)
+    return jsonify(json_response)
 
 if __name__ == '__main__':
    app.run()
