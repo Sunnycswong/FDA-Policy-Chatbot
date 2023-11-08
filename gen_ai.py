@@ -63,10 +63,21 @@ from langchain.schema import HumanMessage
 import logging
 
 # setting up credentials
-os.environ["AZURE_COGNITIVE_SEARCH_SERVICE_NAME"] = "acs-testing-sunny" # replace with yours search service name
-os.environ["AZURE_COGNITIVE_SEARCH_API_KEY"] = "oygYftyrBXiWoDLoZatDKNSLFttn9frM6DE4XlSb7kAzSeBR01eY" # replace with your api key
-os.environ["AZURE_INDEX_NAME"] = "your-index-name" #"namfung-finance-chatbot" # 
+os.environ["AZURE_COGNITIVE_SEARCH_SERVICE_NAME"] = "acs-fda-paid" # replace with yours search service name
+os.environ["AZURE_COGNITIVE_SEARCH_API_KEY"] = "VZhK9GGzAJ625kSvDXUpBo1CmiIfH6Ou64EDhoiSczAzSeADco5j" # replace with your api key
+os.environ["AZURE_INDEX_NAME"] = "fda-index" #"namfung-finance-chatbot" # 
 # end setting up credentials
+
+#Free version of acs
+#index_name = "your-index-name"
+#search_service = "acs-testing-sunny"
+#search_api_key = "oygYftyrBXiWoDLoZatDKNSLFttn9frM6DE4XlSb7kAzSeBR01eY"
+
+#Paid version of acs
+#index_name = "fda-index"
+#search_service = "acs-fda-paid"
+#search_api_key = "VZhK9GGzAJ625kSvDXUpBo1CmiIfH6Ou64EDhoiSczAzSeADco5j"
+
 
 def initialize_vector_store():
     # set up index name 
@@ -402,7 +413,7 @@ def llm_pipeline_with_history(question,sessionId):
     #print(context)
     #print(relevant_documentation)
     source = relevant_documentation[0].metadata['source']
-    #page_no = relevant_documentation[0].metadata['page']
+    real_page_no = relevant_documentation[0].metadata['page']
     website_url = relevant_documentation[0].metadata['website_url']
 
     retriever = vector_store.as_retriever()
@@ -454,6 +465,8 @@ def llm_pipeline_with_history(question,sessionId):
     
     page_no = extract_page_no(answer_value)
     answer = extract_answer(answer_value)
+    
+    page_no = int(real_page_no) + 4
     
     #return answer_value
 
