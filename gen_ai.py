@@ -327,6 +327,7 @@ def generate_prompt_chi_with_history():
     prompt_template = PromptTemplate(template = prompt_template_string, input_variables=["context", "question", "chat_history"])
 
     return prompt_template
+    
 # helper function to extract page number
 def extract_page_no(string):
     if "[Page" in string:
@@ -343,6 +344,19 @@ def extract_answer(string):
         return string.split("[Page")[0]
     else:
         return string
+        
+        
+def get_web_url(source):
+    if source == "CFR-2022-title21-vol5-chapI-subchapC.pdf":
+        website_url = "https://www.govinfo.gov/content/pkg/CFR-2022-title21-vol4/pdf/CFR-2022-title21-vol4-chapI-subchapC.pdf"
+    elif source == "CFR-2022-title21-vol5-chapI-subchapD.pdf":
+        website_url = "https://www.govinfo.gov/content/pkg/CFR-2022-title21-vol5/pdf/CFR-2022-title21-vol5-chapI-subchapD.pdf"
+    elif source == "Bioavailability-and-Bioequivalence-Studies-Submitted-in-NDAs-or-INDs-—-General-Considerations.pdf":
+        website_url = "https://www.fda.gov/media/88254/download"        
+    else:
+        website_url = "/"
+    return website_url    
+
 
 def llm_pipeline_with_history(question,sessionId):
     # set up index name 
@@ -359,11 +373,13 @@ def llm_pipeline_with_history(question,sessionId):
 
     language = detect(question)
 
-    if language == "en":
-    #english prompt
+    # Both Eng
+    if language == "cn":
+    #Chinese prompt
+        # QA_CHAIN_PROMPT = generate_prompt_chi_with_history()
         QA_CHAIN_PROMPT = generate_prompt_with_history()
     else:
-        QA_CHAIN_PROMPT = generate_prompt_chi_with_history()
+        QA_CHAIN_PROMPT = generate_prompt_with_history()
 
     # use AzureChatOpenAI 
     llm = AzureChatOpenAI(deployment_name="gpt-35-16k", temperature=0,
@@ -466,7 +482,7 @@ def llm_pipeline_with_history(question,sessionId):
     page_no = extract_page_no(answer_value)
     answer = extract_answer(answer_value)
     
-    page_no = int(real_page_no) + 4
+    page_no = int(real_page_no) 
     
     #return answer_value
 
@@ -475,7 +491,7 @@ def llm_pipeline_with_history(question,sessionId):
         "raw": answer,
         "answer": answer,
         "source": source,
-        "website_url": website_url,
+        "website_url": get_web_url(source),
         "page_no": str(page_no),
         "first_page_no": first_page_no,
         "language": language
