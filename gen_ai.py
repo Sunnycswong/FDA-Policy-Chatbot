@@ -286,7 +286,7 @@ def extract_answer(string):
         return string
 def generate_prompt_with_history():
     prompt_template_string="""
-    Follow exactly these 6 steps:
+    Follow exactly these 7 steps:
     1. Read the context below and aggregrate this data
     Context : {context}
     2. Answer the question using only this context and the chat history below
@@ -294,6 +294,7 @@ def generate_prompt_with_history():
     4. Please provide the page number of the pages where your answer are based on at the end of your response
     5. Please provide the page numbers in the following output format: [Page: 1, 2, 3]
     6. Allow the chat continue by following Chat History
+    7. Please based on the language of inputted question to respond with the corresponding language of answer. For example: question asking with English, then also return the answer in english. 
     
     Chat History: {chat_history}
 
