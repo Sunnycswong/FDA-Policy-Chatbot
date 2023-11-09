@@ -285,16 +285,20 @@ def extract_answer(string):
     else:
         return string
 def generate_prompt_with_history():
+    
+    # page no. prompt
+    #4. Please provide the page number of the pages where your answer are based on at the end of your response
+    #5. Please provide the page numbers in the following output format: [Page: 1, 2, 3]
+    
     prompt_template_string="""
-    Follow exactly these 7 steps:
-    1. Read the context below and aggregrate this data
+    Follow exactly these 6 steps:
+    1. Take a deep breath and work on this step by step
+    2. Read the context below and aggregrate this data
     Context : {context}
-    2. Answer the question using only this context and the chat history below
-    3. Answer the question in less than 200 words
-    4. Please provide the page number of the pages where your answer are based on at the end of your response
-    5. Please provide the page numbers in the following output format: [Page: 1, 2, 3]
-    6. Allow the chat continue by following Chat History
-    7. Please based on the language of inputted question to respond with the corresponding language of answer. For example: question asking with English, then also return the answer in english. 
+    3. Answer the question using only this context and the chat history below
+    4. Answer the question in less than 200 words
+    5. Allow the chat continue by following Chat History
+    6. Please based on the language of inputted question to respond with the corresponding language of answer. For example: question asking with English, then also return the answer in english. 
     
     Chat History: {chat_history}
 
