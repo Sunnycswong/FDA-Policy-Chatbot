@@ -39,6 +39,7 @@ from langchain.vectorstores.azuresearch import AzureSearch
 from azure.storage.blob import BlobServiceClient
 from azure.core.exceptions import ResourceExistsError
 import json
+import lingua
 
 from langchain.chains import RetrievalQA
 from langchain.chains.question_answering import load_qa_chain
@@ -58,7 +59,7 @@ from langchain.chains import ConversationalRetrievalChain
 from langchain.llms import AzureOpenAI 
 from langchain.chat_models import AzureChatOpenAI
 from langchain.schema import HumanMessage
-
+from lingua import Language, LanguageDetectorBuilder
 #import textwrap
 import logging
 
@@ -365,19 +366,31 @@ def get_web_url(source):
 
 def llm_pipeline_with_history(question,sessionId):
     # set up index name 
-    index_name = os.environ["AZURE_INDEX_NAME"] 
 
     os.environ["OPENAI_API_TYPE"] = "azure"
     os.environ["OPENAI_API_VERSION"] = "2023-05-15"
     os.environ["OPENAI_API_BASE"] = "https://pwcjay.openai.azure.com/"
     os.environ["OPENAI_API_KEY"] = "f282a661571f45a0bdfdcd295ac808e7"
+    
+    
+    languages = [Language.ENGLISH, Language.CHINESE]
+    detector = LanguageDetectorBuilder.from_languages(*languages).build()
+    LANG_DOC = detector.detect_language_of(question)
 
-
+    new_index_name = ""
+    if LANG_DOC == Language.ENGLISH:
+        new_index_name = "fda-index"
+    else:
+        new_index_name = "fda-index-chinese"
+    
+    os.environ["AZURE_INDEX_NAME"] = new_index_name
+    
     # retrieve information from Azure Search
-    relevant_docs, source, website_url, language, page_no = azure_search_by_index(question, index_name)
-
-    language = detect(question)
-
+    relevant_docs, source, website_url, language, page_no = azure_search_by_index(question, new_index_name)
+    
+    
+    # this is detect for question
+    #language = detect(question)
     # Both Eng
     if language == "cn":
     #Chinese prompt
