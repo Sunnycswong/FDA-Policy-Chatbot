@@ -351,17 +351,50 @@ def extract_answer(string):
     else:
         return string
         
-        
+
+# Return website url for front end 
 def get_web_url(source):
+
+    # English Docs
     if source == "CFR-2022-title21-vol4-chapI-subchapC.pdf":
         website_url = "https://www.govinfo.gov/content/pkg/CFR-2022-title21-vol4/pdf/CFR-2022-title21-vol4-chapI-subchapC.pdf"
     elif source == "CFR-2022-title21-vol5-chapI-subchapD.pdf":
         website_url = "https://www.govinfo.gov/content/pkg/CFR-2022-title21-vol5/pdf/CFR-2022-title21-vol5-chapI-subchapD.pdf"
     elif source == "Bioavailability-and-Bioequivalence-Studies-Submitted-in-NDAs-or-INDs-—-General-Considerations.pdf":
         website_url = "https://www.fda.gov/media/88254/download"        
+
+    # Chinese Docs
+    elif source == "4e48ba874faa44e6ad456ccb115ed4da.pdf":
+        website_url = "https://www.samr.gov.cn/cms_files/filemanager/1647978232/attach/20239/4e48ba874faa44e6ad456ccb115ed4da.pdf"
+    elif source == "W020211127359422658751.pdf":
+        website_url = "https://www.samr.gov.cn/cms_files/filemanager/samr/www/samrnew/samrgkml/nsjg/fgs/202003/W020211127359422658751.pdf"
+    elif source == "W020220901560054930904.pdf":
+        website_url = "https://www.samr.gov.cn/cms_files/filemanager/samr/www/samrnew/samrgkml/nsjg/fgs/202209/W020220901560054930904.pdf"
+    elif source == "W020220916370695933445.pdf":
+        website_url = "https://www.samr.gov.cn/cms_files/filemanager/samr/www/samrnew/samrgkml/nsjg/bgt/202107/W020220916370695933445.pdf"
+    elif source == "W020211127362661614597.pdf":
+        website_url = "https://www.samr.gov.cn/cms_files/filemanager/samr/www/samrnew/samrgkml/nsjg/fgs/202003/W020211127362661614597.pdf"
+    
     else:
         website_url = "/"
-    return website_url    
+    return website_url
+
+
+# Rename the chinese source 
+def rename_source(source):
+    if source == "4e48ba874faa44e6ad456ccb115ed4da.pdf":
+        source_name = "药品经营和使用质量监督管理办法"
+    elif source == "W020211127359422658751.pdf":
+        source_name = "药品注册管理办法"
+    elif source == "W020220901560054930904.pdf":
+        source_name = "药品网络销售监督管理办法"
+    elif source == "W020220916370695933445.pdf":
+        source_name = "药品经营质量管理规范"
+    elif source == "W020211127362661614597.pdf":
+        source_name = "药品生产监督管理办法"
+    else:
+        source_name = source
+    return source_name
 
 
 def llm_pipeline_with_history(question,sessionId):
@@ -508,7 +541,7 @@ def llm_pipeline_with_history(question,sessionId):
     json_response = {
         "raw": answer,
         "answer": answer,
-        "source": source,
+        "source": rename_source(source),
         "website_url": get_web_url(source),
         "page_no": str(page_no),
         "first_page_no": first_page_no,
