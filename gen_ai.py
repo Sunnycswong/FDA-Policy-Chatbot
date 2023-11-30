@@ -374,7 +374,8 @@ def get_web_url(source):
         website_url = "https://www.samr.gov.cn/cms_files/filemanager/samr/www/samrnew/samrgkml/nsjg/bgt/202107/W020220916370695933445.pdf"
     elif source == "W020211127362661614597.pdf":
         website_url = "https://www.samr.gov.cn/cms_files/filemanager/samr/www/samrnew/samrgkml/nsjg/fgs/202003/W020211127362661614597.pdf"
-    
+    elif source == "中华人民共和国药品管理法.pdf":
+        website_url = "https://drive.google.com/file/d/1h15xwF1a3g_eGw2frUxXLvfoQwjCtxUs/view?usp=sharing"
     else:
         website_url = "/"
     return website_url
